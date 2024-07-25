@@ -48,6 +48,6 @@ Route::delete("/product/{id}", [ProductController::class, "destroy"]);
 
 
 
-// auth routes
+// auth routes dev
 Route::post("/register", [AuthController::class, "createUser"]);
 Route::post('/login', [AuthController::class, 'login']);
