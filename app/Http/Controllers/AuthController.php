@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use App\Http\Requests\Auth\CreateUserRequest;
 use App\Notifications\EmailVerificationNotification;
+use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
@@ -77,6 +78,21 @@ class AuthController extends Controller
         }
 
     }
+    public function login(Request $request)
+    {
+        $request->validate([
+            'token' => 'required|string',
+        ]);
+
+        $user = Auth::guard('sanctum')->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Invalid token'], 401);
+        }
+
+        return response()->json(['message' => 'Logged in successfully', 'user' => $user], 200);
+    }
+
 
     /**
      * Display the specified resource.
