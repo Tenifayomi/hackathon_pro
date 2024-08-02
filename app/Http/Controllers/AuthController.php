@@ -5,8 +5,16 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Http\Requests\Auth\CreateUserRequest;
+use App\Http\Requests\Auth\verifyUserRequest;
 use App\Notifications\EmailVerificationNotification;
+use Ichtrojan\Otp\Otp;
 use Illuminate\Support\Facades\Auth;
+use App\Http\Requests\Auth\LoginRequest;
+use Illuminate\Support\Facades\Hash;
+use App\Http\Requests\Auth\ForgotPasswordRequest;
+use App\Notifications\forgotPassword;
+
+
 
 class AuthController extends Controller
 {
@@ -15,7 +23,14 @@ class AuthController extends Controller
      */
     public function index()
     {
-        //
+        $allUsers =  User::all();
+
+        $success = [
+          "message" => "Users Fetch Successfully",
+          "data" => $allUsers
+        ];
+  
+       return response()-> json($success, 200);
     }
 
     /**
@@ -78,22 +93,98 @@ class AuthController extends Controller
         }
 
     }
-    public function login(Request $request)
-    {
-        $request->validate([
-            'token' => 'required|string',
+
+    
+    public function verify_user(verifyUserRequest $request){
+       $data = $request ->validated();
+
+     $validatedData =(new Otp)->validate($data ['email'], $data['token']);
+
+
+     if($validatedData->status){
+
+        $root = User::where("email", $validatedData->email)->first();
+
+        $dev = $root->update([
+            'is_verified'=>true,
+            'email_verified_at'=>now()
         ]);
 
-        $user = Auth::guard('sanctum')->user();
+    }else{ $error = 
+        [
+        'message' =>$validatedData->message,
+        'status'=>false
+    ];
+    return response()->json($error, 400);
 
-        if (!$user) {
-            return response()->json(['message' => 'Invalid token'], 401);
-        }
+    }
+if($dev){
+     $token = $root->createToken("auth")->plainTextToken;
 
-        return response()->json(['message' => 'Logged in successfully', 'user' => $user], 200);
+    $success = [
+        'token'=> $token,
+        'message' => 'You have been verified',
+        'data' => $root->fresh()
+    ];
+return response()->json($success, 200);
+
+}else{
+$error = [
+    'message' =>$validatedData->message,
+    'status'=>false
+];
+return response()->json($error, 400);
+}}
+
+public function login (LoginRequest $request){
+    $info = $request->validated();
+
+    $user = User::where("email", $info['email'])->first();
+
+    if($user){
+
+   $correctPassword =  Hash::check($info ["password"], $user->password) ;
+
+   if($correctPassword){
+    $success = [
+        "Message"=> "Log In Successful",
+        "Status"=> true,
+        "Data"=> $user->fresh()
+    ];
+return response()->json($success, 200);
+   }else{
+    $error = [
+        'Message'=> "Email or Password is Incorrect",
+        "Status"=> false
+    ];
+    return response()->json($error, 400);
+   }
+    }
+}
+
+public function forgot_password(ForgotPasswordRequest $request){
+
+    $info = $request->validated();
+
+    $user = User::where("email", $info["email"])->first();
+
+    if($user){
+        $user->notify(New forgotPassword);
+
+        $success = [
+            "Message"=> "Otp sent successfully",
+            "Status"=> true,
+        ];
+        return response()->json($success, 200);
+    }else{
+        $error= [
+            "Message" => "Failed to send Otp, Email not found",
+            "Status" => false
+        ];
+        return response()->json($error, 404);
     }
 
-
+}
     /**
      * Display the specified resource.
      */
